@@ -1,0 +1,1420 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>🚕 Punjab Taxi Driver</title>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+body { background:#000; overflow:hidden; font-family:'Segoe UI',sans-serif; touch-action:none; }
+#gameCanvas { display:block; width:100vw; height:100vh; }
+
+/* ── MODE SELECT SCREEN ── */
+#modeScreen {
+  position:fixed; inset:0; z-index:1000;
+  background:radial-gradient(ellipse at 50% 40%, #1a1000 0%, #000 100%);
+  display:flex; flex-direction:column; align-items:center; justify-content:center; gap:24px;
+}
+.mode-logo { font-size:72px; animation:bob 1.2s ease-in-out infinite alternate; }
+@keyframes bob { from{transform:translateY(0) rotate(-3deg)} to{transform:translateY(-14px) rotate(3deg)} }
+.mode-title { font-size:38px; font-weight:900; color:#ffe600; letter-spacing:4px; text-align:center;
+  text-shadow:0 0 40px rgba(255,200,0,0.7); }
+.mode-sub { font-size:13px; color:#666; letter-spacing:3px; margin-top:-10px; }
+.mode-label { font-size:14px; color:#aaa; letter-spacing:2px; margin-top:10px; }
+.mode-btns { display:flex; gap:18px; }
+.mode-btn {
+  width:150px; height:150px; border-radius:20px; border:2px solid rgba(255,200,0,0.3);
+  background:rgba(255,255,255,0.04); backdrop-filter:blur(10px);
+  display:flex; flex-direction:column; align-items:center; justify-content:center; gap:10px;
+  cursor:pointer; transition:all 0.2s;
+}
+.mode-btn:hover, .mode-btn.selected {
+  border-color:#ffe600; background:rgba(255,200,0,0.12);
+  box-shadow:0 0 30px rgba(255,200,0,0.3); transform:scale(1.05);
+}
+.mode-btn-icon { font-size:44px; }
+.mode-btn-name { font-size:14px; font-weight:700; color:#fff; letter-spacing:2px; }
+.mode-btn-desc { font-size:10px; color:#888; text-align:center; line-height:1.5; padding:0 10px; }
+.start-btn {
+  padding:16px 60px; border-radius:50px; border:none;
+  background:linear-gradient(135deg,#ffe600,#ff8800);
+  font-size:20px; font-weight:900; color:#000; letter-spacing:2px;
+  cursor:pointer; box-shadow:0 0 40px rgba(255,200,0,0.4);
+  animation:glow 2s infinite;
+}
+@keyframes glow { 0%,100%{box-shadow:0 0 40px rgba(255,200,0,0.4)} 50%{box-shadow:0 0 70px rgba(255,200,0,0.8)} }
+.start-btn:active { transform:scale(0.96); }
+.mode-tips { font-size:11px; color:#444; text-align:center; line-height:2; }
+
+/* ── LOADING SCREEN ── */
+#loadScreen {
+  position:fixed; inset:0; z-index:900; background:#000;
+  display:none; flex-direction:column; align-items:center; justify-content:center; gap:20px;
+}
+#loadScreen.show { display:flex; }
+.load-icon { font-size:60px; animation:spin 1s linear infinite; }
+@keyframes spin { from{transform:rotate(0deg)} to{transform:rotate(360deg)} }
+.load-title { font-size:22px; font-weight:700; color:#ffe600; }
+.load-bar-wrap { width:280px; height:8px; background:#222; border-radius:4px; overflow:hidden; }
+.load-bar { height:100%; background:linear-gradient(90deg,#ffe600,#ff8800); width:0%; transition:width 0.3s; border-radius:4px; }
+.load-text { font-size:12px; color:#666; }
+
+/* ── HUD ── */
+#hud { position:fixed; top:0; left:0; right:0; pointer-events:none; z-index:100; }
+#topBar {
+  display:flex; justify-content:space-between; align-items:center;
+  padding:10px 14px; background:linear-gradient(180deg,rgba(0,0,0,0.85) 0%,transparent 100%);
+}
+.hud-box {
+  background:rgba(0,0,0,0.7); border:1px solid rgba(255,200,0,0.4);
+  border-radius:10px; padding:6px 12px; backdrop-filter:blur(6px);
+}
+.hud-label { font-size:9px; color:#aaa; text-transform:uppercase; letter-spacing:1px; }
+.hud-val { font-size:18px; font-weight:700; color:#ffe600; line-height:1.1; }
+.hud-val.green { color:#00ff88; }
+#stars { display:flex; gap:2px; }
+.star { font-size:14px; color:#333; transition:color 0.3s; }
+.star.lit { color:#ffe600; }
+
+/* ── MINIMAP ── */
+#minimap {
+  position:fixed; bottom:120px; right:14px; z-index:100;
+  width:110px; height:110px; border-radius:50%; overflow:hidden;
+  border:2px solid rgba(255,200,0,0.5); background:rgba(0,0,0,0.8);
+  box-shadow:0 0 20px rgba(255,200,0,0.2);
+}
+#minimapCanvas { width:110px; height:110px; }
+
+/* ── PASSENGER PANEL ── */
+#passengerPanel {
+  position:fixed; bottom:130px; left:14px; z-index:100;
+  background:rgba(0,0,0,0.85); border:1px solid rgba(255,200,0,0.4);
+  border-radius:12px; padding:10px 14px; min-width:160px;
+  backdrop-filter:blur(8px); display:none;
+}
+#passengerPanel.show { display:block; }
+.pass-type { font-size:11px; font-weight:700; letter-spacing:1px; }
+.pass-dest { font-size:12px; color:#ccc; margin-top:2px; }
+.pass-fare { font-size:16px; font-weight:700; color:#00ff88; margin-top:4px; }
+#timerBar { width:100%; height:4px; background:#333; border-radius:2px; margin-top:6px; overflow:hidden; }
+#timerFill { height:100%; background:linear-gradient(90deg,#00ff88,#ffe600,#ff4444); transition:width 0.3s; }
+
+/* ── NAV ARROW ── */
+#navArrow {
+  position:fixed; top:50%; left:50%; transform:translate(-50%,-180px);
+  z-index:100; pointer-events:none; opacity:0; transition:opacity 0.3s;
+  font-size:52px; filter:drop-shadow(0 0 12px rgba(255,200,0,0.9));
+}
+#navArrow.show { opacity:1; }
+#distBadge {
+  position:fixed; top:50%; left:50%; transform:translate(-50%,-120px);
+  z-index:100; pointer-events:none;
+  background:rgba(0,0,0,0.75); border-radius:20px; padding:3px 12px;
+  color:#ffe600; font-size:12px; font-weight:700; display:none;
+  border:1px solid rgba(255,200,0,0.3);
+}
+
+/* ── SPEEDO ── */
+#speedoWrap {
+  position:fixed; bottom:130px; right:135px; z-index:100;
+  background:rgba(0,0,0,0.75); border:1px solid rgba(255,200,0,0.3);
+  border-radius:50%; width:80px; height:80px;
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  backdrop-filter:blur(6px);
+}
+#speedVal { font-size:22px; font-weight:900; color:#ffe600; line-height:1; }
+#speedUnit { font-size:9px; color:#888; letter-spacing:1px; }
+
+/* ── MSG OVERLAY ── */
+#msgOverlay {
+  position:fixed; top:50%; left:50%; transform:translate(-50%,-50%);
+  z-index:200; text-align:center; pointer-events:none;
+  opacity:0; transition:opacity 0.4s;
+}
+#msgOverlay.show { opacity:1; }
+#msgText { font-size:28px; font-weight:900; color:#ffe600;
+  text-shadow:0 0 30px rgba(255,200,0,0.8),0 2px 4px rgba(0,0,0,0.9); letter-spacing:2px; }
+#msgSub { font-size:14px; color:#aaa; margin-top:6px; }
+
+/* ── MOBILE CONTROLS ── */
+#controls {
+  position:fixed; bottom:0; left:0; right:0; z-index:150;
+  display:none; justify-content:space-between; align-items:flex-end;
+  padding:0 14px 18px; pointer-events:none;
+}
+#controls.mobile-mode { display:flex; }
+.ctrl-group { display:flex; flex-direction:column; gap:8px; pointer-events:all; }
+.ctrl-row { display:flex; gap:8px; justify-content:center; }
+.ctrl-btn {
+  width:64px; height:64px; border-radius:16px;
+  border:2px solid rgba(255,200,0,0.4);
+  background:rgba(0,0,0,0.75); backdrop-filter:blur(8px);
+  display:flex; align-items:center; justify-content:center;
+  font-size:26px; cursor:pointer; user-select:none;
+  -webkit-tap-highlight-color:transparent;
+  transition:background 0.1s, transform 0.1s;
+  touch-action:manipulation;
+}
+.ctrl-btn:active, .ctrl-btn.pressed {
+  background:rgba(255,200,0,0.3); transform:scale(0.92);
+  border-color:rgba(255,200,0,0.9);
+}
+.ctrl-btn.accel { background:rgba(0,180,80,0.25); border-color:rgba(0,200,80,0.5); }
+.ctrl-btn.brake { background:rgba(200,40,40,0.25); border-color:rgba(200,40,40,0.5); }
+.ctrl-btn.accel.pressed { background:rgba(0,200,80,0.5); }
+.ctrl-btn.brake.pressed { background:rgba(200,40,40,0.5); }
+
+/* ── PC CONTROLS HINT ── */
+#pcHint {
+  position:fixed; bottom:14px; left:50%; transform:translateX(-50%);
+  z-index:100; display:none; gap:8px; pointer-events:none;
+}
+#pcHint.pc-mode { display:flex; }
+.key-badge {
+  background:rgba(0,0,0,0.7); border:1px solid rgba(255,200,0,0.3);
+  border-radius:8px; padding:5px 10px; color:#aaa; font-size:11px;
+  letter-spacing:1px;
+}
+.key-badge span { color:#ffe600; font-weight:700; }
+
+/* ── FUEL BAR ── */
+#fuelBar {
+  position:fixed; top:80px; left:14px; z-index:100;
+  display:flex; align-items:center; gap:8px;
+  background:rgba(0,0,0,0.7); border:1px solid rgba(255,100,0,0.4);
+  border-radius:20px; padding:5px 12px;
+}
+#fuelIcon { font-size:14px; }
+#fuelFillWrap { width:80px; height:6px; background:#333; border-radius:3px; overflow:hidden; }
+#fuelLevel { height:100%; background:linear-gradient(90deg,#ff4400,#ffaa00,#00ff44); transition:width 0.4s; }
+
+/* ── TIME INDICATOR ── */
+#timeIndicator { position:fixed; top:80px; right:14px; z-index:100; font-size:22px; pointer-events:none; }
+
+/* ── MISSION PANEL ── */
+#missionPanel {
+  position:fixed; top:115px; left:50%; transform:translateX(-50%);
+  z-index:100; background:rgba(0,0,0,0.8); border:1px solid rgba(100,200,255,0.4);
+  border-radius:10px; padding:6px 18px; text-align:center;
+  backdrop-filter:blur(6px); display:none;
+}
+#missionPanel.show { display:block; }
+#missionText { font-size:12px; color:#88ccff; font-weight:600; letter-spacing:1px; }
+
+/* ── CRASH FLASH ── */
+#crashFlash {
+  position:fixed; inset:0; z-index:300; background:rgba(255,0,0,0.45);
+  pointer-events:none; opacity:0; transition:opacity 0.15s;
+}
+#crashFlash.show { opacity:1; }
+
+/* ── MONEY POPUP ── */
+.money-popup {
+  position:fixed; z-index:400; font-size:24px; font-weight:900;
+  color:#00ff88; text-shadow:0 0 12px rgba(0,255,100,0.8);
+  pointer-events:none; animation:floatUp 1.5s forwards;
+}
+@keyframes floatUp { 0%{opacity:1;transform:translateY(0)} 100%{opacity:0;transform:translateY(-90px)} }
+
+/* ── FUEL ALERT ── */
+#fuelAlert {
+  position:fixed; top:46%; left:50%; transform:translate(-50%,-50%);
+  z-index:200; background:rgba(255,80,0,0.92); border-radius:12px;
+  padding:10px 22px; color:#fff; font-weight:700; font-size:14px;
+  display:none; animation:blink 0.6s infinite;
+}
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.35} }
+
+/* ── MODEL ERROR BANNER ── */
+#modelWarn {
+  position:fixed; top:115px; left:50%; transform:translateX(-50%);
+  z-index:500; background:rgba(255,120,0,0.92); border-radius:10px;
+  padding:8px 18px; color:#fff; font-size:11px; font-weight:600;
+  text-align:center; display:none; max-width:90vw;
+}
+</style>
+</head>
+<body>
+
+<!-- ══ MODE SELECT SCREEN ══ -->
+<div id="modeScreen">
+  <div class="mode-logo">🚕</div>
+  <div class="mode-title">PUNJAB TAXI<br>DRIVER</div>
+  <div class="mode-sub">AMRITSAR CITY SIMULATOR</div>
+  <div class="mode-label">CONTROL MODE CHUNNO:</div>
+  <div class="mode-btns">
+    <div class="mode-btn selected" id="btnMobile" onclick="selectMode('mobile')">
+      <div class="mode-btn-icon">📱</div>
+      <div class="mode-btn-name">MOBILE</div>
+      <div class="mode-btn-desc">Touch buttons<br>screen pe</div>
+    </div>
+    <div class="mode-btn" id="btnPC" onclick="selectMode('pc')">
+      <div class="mode-btn-icon">💻</div>
+      <div class="mode-btn-name">PC</div>
+      <div class="mode-btn-desc">WASD ya<br>Arrow Keys</div>
+    </div>
+  </div>
+  <button class="start-btn" onclick="startLoading()">GAME SHURU KARO ▶</button>
+  <div class="mode-tips">
+    🟡 Yellow marker = Passenger pickup<br>
+    🔴 Red marker = Destination<br>
+    ⭐ Rating upar rakho VIP passengers layi
+  </div>
+</div>
+
+<!-- ══ LOADING SCREEN ══ -->
+<div id="loadScreen">
+  <div class="load-icon">⚙️</div>
+  <div class="load-title">CITY LOAD HO RAHI HAI...</div>
+  <div class="load-bar-wrap"><div class="load-bar" id="loadBar"></div></div>
+  <div class="load-text" id="loadText">Models load ho rahe hain...</div>
+</div>
+
+<!-- ══ GAME ══ -->
+<canvas id="gameCanvas"></canvas>
+<div id="modelWarn"></div>
+
+<!-- HUD -->
+<div id="hud">
+  <div id="topBar">
+    <div class="hud-box">
+      <div class="hud-label">Kamai</div>
+      <div class="hud-val green" id="moneyVal">₹0</div>
+    </div>
+    <div class="hud-box" style="text-align:center">
+      <div class="hud-label">Rating</div>
+      <div id="stars">
+        <span class="star lit" id="s1">★</span>
+        <span class="star" id="s2">★</span>
+        <span class="star" id="s3">★</span>
+        <span class="star" id="s4">★</span>
+        <span class="star" id="s5">★</span>
+      </div>
+    </div>
+    <div class="hud-box">
+      <div class="hud-label">Rides</div>
+      <div class="hud-val" id="ridesVal">0</div>
+    </div>
+  </div>
+</div>
+
+<div id="fuelBar">
+  <span id="fuelIcon">⛽</span>
+  <div id="fuelFillWrap"><div id="fuelLevel" style="width:100%"></div></div>
+</div>
+<div id="timeIndicator">☀️</div>
+<div id="missionPanel"><div id="missionText">MISSION: 3 rides complete karo</div></div>
+
+<!-- Passenger -->
+<div id="passengerPanel">
+  <div class="pass-type" id="passType" style="color:#88aaff">NORMAL</div>
+  <div class="pass-dest" id="passDest">→ Destination</div>
+  <div class="pass-fare" id="passFare">₹80</div>
+  <div id="timerBar"><div id="timerFill" style="width:100%"></div></div>
+</div>
+
+<!-- Minimap -->
+<div id="minimap"><canvas id="minimapCanvas" width="110" height="110"></canvas></div>
+
+<!-- Speedo -->
+<div id="speedoWrap">
+  <div id="speedVal">0</div>
+  <div id="speedUnit">KM/H</div>
+</div>
+
+<!-- Nav -->
+<div id="navArrow">⬆️</div>
+<div id="distBadge">0m</div>
+
+<!-- Message -->
+<div id="msgOverlay">
+  <div id="msgText"></div>
+  <div id="msgSub"></div>
+</div>
+
+<!-- Crash -->
+<div id="crashFlash"></div>
+<div id="fuelAlert">⛽ FUEL KHATAM! GAS STATION TE JAO!</div>
+
+<!-- Mobile Controls -->
+<div id="controls">
+  <div class="ctrl-group">
+    <div class="ctrl-row">
+      <button class="ctrl-btn accel" id="btnUp"
+        ontouchstart="pressBtn('up',true)" ontouchend="pressBtn('up',false)"
+        onmousedown="pressBtn('up',true)" onmouseup="pressBtn('up',false)">⬆️</button>
+    </div>
+    <div class="ctrl-row">
+      <button class="ctrl-btn" id="btnLeft"
+        ontouchstart="pressBtn('left',true)" ontouchend="pressBtn('left',false)"
+        onmousedown="pressBtn('left',true)" onmouseup="pressBtn('left',false)">⬅️</button>
+      <button class="ctrl-btn brake" id="btnDown"
+        ontouchstart="pressBtn('down',true)" ontouchend="pressBtn('down',false)"
+        onmousedown="pressBtn('down',true)" onmouseup="pressBtn('down',false)">⬇️</button>
+      <button class="ctrl-btn" id="btnRight"
+        ontouchstart="pressBtn('right',true)" ontouchend="pressBtn('right',false)"
+        onmousedown="pressBtn('right',true)" onmouseup="pressBtn('right',false)">➡️</button>
+    </div>
+  </div>
+  <div class="ctrl-group" style="align-items:flex-end">
+    <button class="ctrl-btn" ontouchstart="honk()" onmousedown="honk()" style="font-size:20px">📢</button>
+  </div>
+</div>
+
+<!-- PC Hint -->
+<div id="pcHint">
+  <div class="key-badge"><span>W/↑</span> Aage</div>
+  <div class="key-badge"><span>S/↓</span> Brake</div>
+  <div class="key-badge"><span>A/↓</span> Left</div>
+  <div class="key-badge"><span>D/→</span> Right</div>
+  <div class="key-badge"><span>H</span> Horn</div>
+</div>
+
+<!-- THREE.JS -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<!-- GLTFLoader: load synchronously BEFORE game code -->
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+<script>
+// ══════════════════════════════════════════════════════════
+// GAME STATE
+// ══════════════════════════════════════════════════════════
+var gameMode = 'mobile'; // 'mobile' or 'pc'
+var gameStarted = false;
+
+const state = {
+  money:0, rating:3.0, rides:0,
+  hasPassenger:false, waitingPickup:false,
+  passenger:null, pickupPos:null, destPos:null,
+  rideTimer:0, rideTimeLimit:60,
+  fuel:100,
+  speed:0, maxSpeed:0.42,
+  angle:0,
+  pos:{x:4, z:4},
+  dayTime:8,
+  totalTime:0,
+  keys:{up:false,down:false,left:false,right:false},
+  crashCooldown:0,
+  safeRides:0,
+  trafficCars:[],
+  pedestrians:[],
+  fuelStations:[{x:-50,z:10,r:5},{x:50,z:-10,r:5},{x:10,z:50,r:5},{x:-10,z:-50,r:5}],
+  missions:[
+    {text:"3 rides complete karo",target:3,type:'rides',reward:200},
+    {text:"VIP passenger chukko",target:1,type:'vip',reward:500},
+    {text:"5 rides bina crash de",target:5,type:'safe',reward:300},
+  ],
+  currentMission:0, missionProgress:0,
+};
+
+// ══════════════════════════════════════════════════════════
+// MODE SELECT
+// ══════════════════════════════════════════════════════════
+function selectMode(m) {
+  gameMode = m;
+  document.getElementById('btnMobile').classList.toggle('selected', m==='mobile');
+  document.getElementById('btnPC').classList.toggle('selected', m==='pc');
+}
+
+function startLoading() {
+  document.getElementById('modeScreen').style.display = 'none';
+  document.getElementById('loadScreen').classList.add('show');
+  if (gameMode === 'mobile') {
+    document.getElementById('controls').classList.add('mobile-mode');
+  } else {
+    document.getElementById('pcHint').classList.add('pc-mode');
+  }
+  // GLTFLoader already loaded synchronously — go straight to init
+  initGame();
+}
+
+// ══════════════════════════════════════════════════════════
+// THREE.JS SETUP
+// ══════════════════════════════════════════════════════════
+const canvas = document.getElementById('gameCanvas');
+const renderer = new THREE.WebGLRenderer({canvas, antialias:true});
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.setClearColor(0x88aaee);
+
+const scene = new THREE.Scene();
+scene.fog = new THREE.FogExp2(0x88aacc, 0.010);
+
+const camera = new THREE.PerspectiveCamera(65, innerWidth/innerHeight, 0.1, 400);
+
+function onResize() {
+  renderer.setSize(innerWidth, innerHeight);
+  camera.aspect = innerWidth / innerHeight;
+  camera.updateProjectionMatrix();
+}
+onResize();
+window.addEventListener('resize', onResize);
+
+// Lights
+const ambLight = new THREE.AmbientLight(0x8899bb, 0.7);
+scene.add(ambLight);
+const sunLight = new THREE.DirectionalLight(0xfff0cc, 1.4);
+sunLight.position.set(60, 100, 40);
+sunLight.castShadow = true;
+sunLight.shadow.mapSize.width = 2048;
+sunLight.shadow.mapSize.height = 2048;
+sunLight.shadow.camera.near = 1;
+sunLight.shadow.camera.far = 400;
+sunLight.shadow.camera.left = -120;
+sunLight.shadow.camera.right = 120;
+sunLight.shadow.camera.top = 120;
+sunLight.shadow.camera.bottom = -120;
+scene.add(sunLight);
+const hemiLight = new THREE.HemisphereLight(0x99aaff, 0x554433, 0.5);
+scene.add(hemiLight);
+
+// ══════════════════════════════════════════════════════════
+// CITY CONSTANTS
+// ══════════════════════════════════════════════════════════
+const gridLines = [-80,-60,-40,-20,0,20,40,60,80];
+const buildings = [];
+const trafficLights = [];
+
+// ══════════════════════════════════════════════════════════
+// CITY BUILD
+// ══════════════════════════════════════════════════════════
+function buildCity() {
+  // Ground
+  const gGeo = new THREE.PlaneGeometry(240,240);
+  const gMat = new THREE.MeshLambertMaterial({color:0x3a4a2a});
+  const ground = new THREE.Mesh(gGeo, gMat);
+  ground.rotation.x = -Math.PI/2;
+  ground.receiveShadow = true;
+  scene.add(ground);
+
+  // Roads
+  const roadMat = new THREE.MeshLambertMaterial({color:0x2a2a2a});
+  const sideMat = new THREE.MeshLambertMaterial({color:0x777766});
+
+  for (const gx of gridLines) {
+    // Road surface
+    const rg = new THREE.PlaneGeometry(8, 220);
+    const rm = new THREE.Mesh(rg, roadMat);
+    rm.rotation.x = -Math.PI/2; rm.position.set(gx,0.01,0); rm.receiveShadow=true;
+    scene.add(rm);
+    // Sidewalks
+    for (const s of [-5.5,5.5]) {
+      const sg = new THREE.PlaneGeometry(2,220);
+      const sm = new THREE.Mesh(sg, sideMat);
+      sm.rotation.x=-Math.PI/2; sm.position.set(gx+s,0.015,0); scene.add(sm);
+    }
+  }
+  for (const gz of gridLines) {
+    const rg = new THREE.PlaneGeometry(220,8);
+    const rm = new THREE.Mesh(rg, roadMat);
+    rm.rotation.x=-Math.PI/2; rm.position.set(0,0.01,gz); rm.receiveShadow=true;
+    scene.add(rm);
+    for (const s of [-5.5,5.5]) {
+      const sg = new THREE.PlaneGeometry(220,2);
+      const sm = new THREE.Mesh(sg, sideMat);
+      sm.rotation.x=-Math.PI/2; sm.position.set(0,0.015,gz+s); scene.add(sm);
+    }
+  }
+
+  // Road center dashes
+  const dashMat = new THREE.MeshLambertMaterial({color:0xddddcc});
+  for (const gx of gridLines) {
+    for (let dz=-100; dz<100; dz+=7) {
+      const dg = new THREE.PlaneGeometry(0.25,3.5);
+      const d = new THREE.Mesh(dg, dashMat);
+      d.rotation.x=-Math.PI/2; d.position.set(gx,0.025,dz); scene.add(d);
+    }
+  }
+  for (const gz of gridLines) {
+    for (let dx=-100; dx<100; dx+=7) {
+      const dg = new THREE.PlaneGeometry(3.5,0.25);
+      const d = new THREE.Mesh(dg, dashMat);
+      d.rotation.x=-Math.PI/2; d.position.set(dx,0.025,gz); scene.add(d);
+    }
+  }
+
+  // Buildings
+  buildBuildings();
+
+  // Traffic lights
+  for (const gx of [-40,-20,0,20,40]) {
+    for (const gz of [-40,-20,0,20,40]) {
+      makeTrafficLight(gx+4.5, gz+4.5);
+    }
+  }
+
+  // Fuel stations (visual)
+  for (const fs of state.fuelStations) {
+    makeFuelStation(fs.x, fs.z);
+  }
+
+  // Parked car5 spots
+  spawnParkedCars();
+}
+
+// ── Buildings (code-generated, varied styles) ──
+const BCOLS = [0x8b6f5e,0x6e8b8b,0x8b8b6e,0x5e7a8b,0x7a5e8b,0xa0856a,0x6a8070,0x4a6a8a,0x8a4a4a,0x6a8a5a];
+function buildBuildings() {
+  for (let bx=-90; bx<=90; bx+=20) {
+    for (let bz=-90; bz<=90; bz+=20) {
+      const onRX = gridLines.some(g=>Math.abs(bx-g)<7);
+      const onRZ = gridLines.some(g=>Math.abs(bz-g)<7);
+      if (onRX || onRZ) continue;
+      const count = 1+Math.floor(Math.random()*2);
+      for (let i=0;i<count;i++) {
+        const ox=(Math.random()-0.5)*5, oz=(Math.random()-0.5)*5;
+        makeProcBuilding(bx+ox, bz+oz);
+      }
+    }
+  }
+}
+
+function makeProcBuilding(x,z) {
+  const w=5+Math.random()*7, d=5+Math.random()*7, h=5+Math.random()*22;
+  const col = BCOLS[Math.floor(Math.random()*BCOLS.length)];
+  const geo = new THREE.BoxGeometry(w,h,d);
+  const mat = new THREE.MeshLambertMaterial({color:col});
+  const mesh = new THREE.Mesh(geo,mat);
+  mesh.position.set(x,h/2,z);
+  mesh.castShadow=true; mesh.receiveShadow=true;
+  scene.add(mesh);
+
+  // Windows
+  const winMat = new THREE.MeshLambertMaterial({color:0xffffcc,emissive:0x443300,emissiveIntensity:0.3});
+  for (let wy=2;wy<h-1;wy+=2.5) {
+    for (let f=0;f<4;f++) {
+      const wg=new THREE.PlaneGeometry(0.9,0.9);
+      const wm=new THREE.Mesh(wg,winMat.clone());
+      const a=f*Math.PI/2;
+      wm.position.set(x+(w/2+0.02)*Math.cos(a), wy, z+(d/2+0.02)*Math.sin(a));
+      wm.rotation.y=-a;
+      scene.add(wm);
+    }
+  }
+
+  // Roof details for taller buildings
+  if (h>12) {
+    const roofG=new THREE.BoxGeometry(w*0.4,1.5,d*0.4);
+    const roofM=new THREE.MeshLambertMaterial({color:0x555555});
+    const roof=new THREE.Mesh(roofG,roofM);
+    roof.position.set(x,h+0.75,z);
+    scene.add(roof);
+  }
+
+  buildings.push({x, z, w:w+1.2, d:d+1.2});
+}
+
+function makeTrafficLight(x,z) {
+  const poleMat=new THREE.MeshLambertMaterial({color:0x333333});
+  const poleG=new THREE.CylinderGeometry(0.1,0.1,4,8);
+  const pole=new THREE.Mesh(poleG,poleMat);
+  pole.position.set(x,2,z); scene.add(pole);
+
+  const boxG=new THREE.BoxGeometry(0.5,1.3,0.3);
+  const boxM=new THREE.MeshLambertMaterial({color:0x111111});
+  const box=new THREE.Mesh(boxG,boxM);
+  box.position.set(x,4.3,z); scene.add(box);
+
+  const redM=new THREE.MeshLambertMaterial({color:0xff2200,emissive:0x440000});
+  const grnM=new THREE.MeshLambertMaterial({color:0x00ff44,emissive:0x004400});
+  const sG=new THREE.SphereGeometry(0.14,8,8);
+
+  const redL=new THREE.Mesh(sG,redM);
+  redL.position.set(x,4.7,z+0.18); scene.add(redL);
+  const grnL=new THREE.Mesh(sG,grnM);
+  grnL.position.set(x,3.9,z+0.18); scene.add(grnL);
+
+  trafficLights.push({redL,grnL,state:'green',timer:0});
+}
+
+function makeFuelStation(x,z) {
+  const baseG=new THREE.BoxGeometry(10,0.2,8);
+  const baseM=new THREE.MeshLambertMaterial({color:0x888866});
+  const base=new THREE.Mesh(baseG,baseM); base.position.set(x,0.1,z); scene.add(base);
+
+  const roofG=new THREE.BoxGeometry(10,0.4,8);
+  const roofM=new THREE.MeshLambertMaterial({color:0xdd3300});
+  const roof=new THREE.Mesh(roofG,roofM); roof.position.set(x,4,z); scene.add(roof);
+
+  for (const px of [-3.5,3.5]) {
+    const pG=new THREE.CylinderGeometry(0.18,0.18,4,8);
+    const pM=new THREE.MeshLambertMaterial({color:0x555544});
+    const p=new THREE.Mesh(pG,pM); p.position.set(x+px,2,z); scene.add(p);
+  }
+
+  const signG=new THREE.BoxGeometry(4,1.2,0.1);
+  const signM=new THREE.MeshLambertMaterial({color:0xffcc00,emissive:0x443300,emissiveIntensity:0.5});
+  const sign=new THREE.Mesh(signG,signM); sign.position.set(x,5.2,z-4.1); scene.add(sign);
+}
+
+// ── Markers ──
+let pickupMarker, destMarker;
+function makeMarker(color) {
+  const g=new THREE.Group();
+  const pG=new THREE.CylinderGeometry(0.08,0.08,3.5,8);
+  const pM=new THREE.MeshLambertMaterial({color});
+  const pole=new THREE.Mesh(pG,pM); pole.position.y=1.75; g.add(pole);
+
+  const fG=new THREE.BoxGeometry(1.3,0.7,0.06);
+  const fM=new THREE.MeshLambertMaterial({color,emissive:color,emissiveIntensity:0.6});
+  const flag=new THREE.Mesh(fG,fM); flag.position.set(0.65,3.5,0); g.add(flag);
+
+  const rG=new THREE.RingGeometry(0.9,1.4,20);
+  const rM=new THREE.MeshLambertMaterial({color,emissive:color,emissiveIntensity:1,side:THREE.DoubleSide});
+  const ring=new THREE.Mesh(rG,rM); ring.rotation.x=-Math.PI/2; ring.position.y=0.05; g.add(ring);
+  g.userData.ring=ring;
+
+  scene.add(g); g.visible=false;
+  return g;
+}
+
+// ── Pedestrians (code) ──
+function makePedestrian(x,z) {
+  const g=new THREE.Group();
+  const cols=[0xff6688,0x88aaff,0xffaa44,0x88ffaa,0xaa88ff,0xff8844,0x44ffcc];
+  const bodyG=new THREE.CylinderGeometry(0.18,0.15,0.95,8);
+  const bodyM=new THREE.MeshLambertMaterial({color:cols[Math.floor(Math.random()*cols.length)]});
+  const body=new THREE.Mesh(bodyG,bodyM); body.position.y=0.7; g.add(body);
+  const headG=new THREE.SphereGeometry(0.19,8,8);
+  const headM=new THREE.MeshLambertMaterial({color:0xffccaa});
+  const head=new THREE.Mesh(headG,headM); head.position.y=1.5; g.add(head);
+  g.position.set(x,0,z); scene.add(g);
+  const dir=Math.random()*Math.PI*2;
+  state.pedestrians.push({mesh:g,dir,spd:0.018+Math.random()*0.018,x,z,timer:0});
+}
+
+// ══════════════════════════════════════════════════════════
+// MODEL LOADING
+// ══════════════════════════════════════════════════════════
+var loadedModels = {taxi:null, trafficCars:[], car5:null};
+var taxiGroup = null; // actual player car group in scene
+
+function loadModels(onDone) {
+  // 5 models total: car1, car2, car3, car4, car5
+  const MODELS = [
+    {file:'models/car1.glb', role:'taxi'},
+    {file:'models/car2.glb', role:'traffic'},
+    {file:'models/car3.glb', role:'traffic'},
+    {file:'models/car4.glb', role:'traffic'},
+    {file:'models/car5.glb', role:'parked'},
+  ];
+
+  let done = 0;
+  const total = MODELS.length;
+
+  function checkDone() {
+    done++;
+    const pct = Math.round(done / total * 80) + 20;
+    document.getElementById('loadBar').style.width = pct + '%';
+    if (done >= total) {
+      // Fill in any missing traffic cars with fallbacks
+      if (loadedModels.trafficCars.length === 0) buildFallbackTrafficCars();
+      onDone();
+    }
+  }
+
+  if (typeof THREE.GLTFLoader === 'undefined' || !THREE.GLTFLoader) {
+    console.warn('GLTFLoader not available — using fallback geometry');
+    showWarn('GLTFLoader nahi mila — code models use ho rahe hain');
+    buildFallbackTaxi();
+    buildFallbackTrafficCars();
+    onDone();
+    return;
+  }
+
+  const loader = new THREE.GLTFLoader();
+
+  MODELS.forEach(function(m) {
+    document.getElementById('loadText').textContent = m.file + ' load ho raha hai...';
+    loader.load(
+      m.file,
+      function(gltf) {
+        const s = gltf.scene;
+        s.traverse(function(c){ if(c.isMesh){ c.castShadow=true; c.receiveShadow=true; }});
+        if (m.role === 'taxi') {
+          loadedModels.taxi = s;
+          document.getElementById('loadText').textContent = 'Taxi (car1) load ho gaya! ✓';
+        } else if (m.role === 'traffic') {
+          loadedModels.trafficCars.push(s);
+          document.getElementById('loadText').textContent = m.file + ' load ho gaya! ✓';
+        } else if (m.role === 'parked') {
+          loadedModels.car5 = s;
+          document.getElementById('loadText').textContent = 'car5 (parked) load ho gaya! ✓';
+        }
+        checkDone();
+      },
+      function(xhr) {
+        // progress
+      },
+      function(err) {
+        console.warn(m.file + ' load nahi hua:', err);
+        document.getElementById('loadText').textContent = m.file + ' nahi mila — fallback use ho raha hai';
+        // fallback for this specific model
+        if (m.role === 'taxi' && !loadedModels.taxi) buildFallbackTaxi();
+        checkDone();
+      }
+    );
+  });
+}
+
+// Fallback taxi — yellow box car
+function buildFallbackTaxi() {
+  const g=new THREE.Group();
+  const bodyG=new THREE.BoxGeometry(2.1,0.9,4.2);
+  const bodyM=new THREE.MeshLambertMaterial({color:0xffe600});
+  const body=new THREE.Mesh(bodyG,bodyM); body.position.y=0.65; body.castShadow=true; g.add(body);
+  const cabG=new THREE.BoxGeometry(1.9,0.75,2.2);
+  const cabM=new THREE.MeshLambertMaterial({color:0xffd000});
+  const cab=new THREE.Mesh(cabG,cabM); cab.position.set(0,1.4,-0.2); g.add(cab);
+  for (const [wx,wz] of [[-1.1,1.5],[1.1,1.5],[-1.1,-1.5],[1.1,-1.5]]) {
+    const wG=new THREE.CylinderGeometry(0.34,0.34,0.24,12);
+    const wM=new THREE.MeshLambertMaterial({color:0x1a1a1a});
+    const w=new THREE.Mesh(wG,wM); w.rotation.z=Math.PI/2; w.position.set(wx,0.34,wz); g.add(w);
+  }
+  loadedModels.taxi=g;
+}
+
+// Fallback traffic car
+function buildFallbackTrafficCar(color) {
+  const g=new THREE.Group();
+  const bG=new THREE.BoxGeometry(1.9,0.85,3.8);
+  const bM=new THREE.MeshLambertMaterial({color});
+  const b=new THREE.Mesh(bG,bM); b.position.y=0.6; b.castShadow=true; g.add(b);
+  const cG=new THREE.BoxGeometry(1.7,0.65,2.0);
+  const cM=new THREE.MeshLambertMaterial({color:new THREE.Color(color).multiplyScalar(0.85).getHex()});
+  const c=new THREE.Mesh(cG,cM); c.position.set(0,1.2,-0.1); g.add(c);
+  for (const [wx,wz] of [[-1,1.3],[1,1.3],[-1,-1.3],[1,-1.3]]) {
+    const wG=new THREE.CylinderGeometry(0.3,0.3,0.22,10);
+    const wM=new THREE.MeshLambertMaterial({color:0x1a1a1a});
+    const w=new THREE.Mesh(wG,wM); w.rotation.z=Math.PI/2; w.position.set(wx,0.3,wz); g.add(w);
+  }
+  return g;
+}
+function buildFallbackTrafficCars() {
+  const cols=[0xff4444,0x4466ff,0x44bb44,0xff8800];
+  cols.forEach(c=>loadedModels.trafficCars.push(buildFallbackTrafficCar(c)));
+}
+
+// ══════════════════════════════════════════════════════════
+// PLACE MODELS IN SCENE
+// ══════════════════════════════════════════════════════════
+function scaleAndGroundModel(model, targetSize) {
+  const box = new THREE.Box3().setFromObject(model);
+  const size = new THREE.Vector3();
+  box.getSize(size);
+  const maxDim = Math.max(size.x, size.y, size.z);
+  if (maxDim > 0) model.scale.setScalar(targetSize / maxDim);
+  // Re-compute after scale
+  const box2 = new THREE.Box3().setFromObject(model);
+  model.position.y = -box2.min.y;
+  model.traverse(function(c){ if(c.isMesh){ c.castShadow=true; c.receiveShadow=true; }});
+}
+
+function placeTaxiInScene() {
+  var model;
+  if (loadedModels.taxi) {
+    model = loadedModels.taxi.clone();
+    scaleAndGroundModel(model, 3.8);
+  } else {
+    buildFallbackTaxi();
+    model = loadedModels.taxi;
+  }
+  taxiGroup = new THREE.Group();
+  taxiGroup.add(model);
+  taxiGroup.position.set(state.pos.x, 0, state.pos.z);
+  scene.add(taxiGroup);
+}
+
+// Traffic cars
+const TRF_COLS=[0xff4444,0x4466ff,0x44bb44,0xff8800,0xcc44cc,0x44cccc,0xaaaaaa];
+function spawnTrafficCars() {
+  for (let i=0;i<18;i++) {
+    const axis=Math.random()<0.5?'x':'z';
+    const roadVal=gridLines[Math.floor(Math.random()*gridLines.length)];
+    const pos=(Math.random()-0.5)*160;
+    const dir=Math.random()<0.5?1:-1;
+    const cx=axis==='x'?pos:roadVal+(dir>0?2:-2);
+    const cz=axis==='z'?pos:roadVal+(dir>0?2:-2);
+    const ang=axis==='x'?(dir>0?0:Math.PI):(dir>0?Math.PI/2:-Math.PI/2);
+
+    let carMesh;
+    if (loadedModels.trafficCars.length > 0) {
+      const srcModel = loadedModels.trafficCars[i % loadedModels.trafficCars.length];
+      carMesh = srcModel.clone();
+      scaleAndGroundModel(carMesh, 4.0);
+    } else {
+      carMesh = buildFallbackTrafficCar(TRF_COLS[i % TRF_COLS.length]);
+    }
+
+    const g=new THREE.Group();
+    g.add(carMesh);
+    g.position.set(cx,0,cz);
+    g.rotation.y=ang;
+    scene.add(g);
+
+    state.trafficCars.push({mesh:g,axis,roadVal,dir,spd:0.07+Math.random()*0.1,x:cx,z:cz});
+  }
+}
+
+// Parked car5 spots
+function spawnParkedCars() {
+  // Place after models loaded — called from initScene
+}
+function placeParkedCars() {
+  const spots=[
+    {x:-30,z:25,a:0},{x:30,z:-25,a:Math.PI},{x:-50,z:-30,a:Math.PI/2},
+    {x:50,z:30,a:-Math.PI/2},{x:10,z:-50,a:0},{x:-10,z:50,a:Math.PI},
+    {x:70,z:10,a:Math.PI/2},{x:-70,z:-10,a:-Math.PI/2},
+  ];
+  for (const sp of spots) {
+    let model;
+    if (loadedModels.car5) {
+      model = loadedModels.car5.clone();
+      scaleAndGroundModel(model, 3.8);
+    } else {
+      model = buildFallbackTrafficCar(0x888899);
+    }
+    const g=new THREE.Group();
+    g.add(model);
+    g.position.set(sp.x,0,sp.z);
+    g.rotation.y=sp.a;
+    scene.add(g);
+  }
+}
+
+// ══════════════════════════════════════════════════════════
+// INIT GAME
+// ══════════════════════════════════════════════════════════
+function initGame() {
+  setLoadProgress(20,'City ban rahi hai...');
+  buildCity();
+  setLoadProgress(50,'Models load ho rahe hain...');
+
+  loadModels(()=>{
+    setLoadProgress(80,'Gaadiyan rakh raha haan...');
+    placeTaxiInScene();
+    spawnTrafficCars();
+    placeParkedCars();
+
+    // Pedestrians
+    for (let i=0;i<28;i++) {
+      const rX=gridLines[Math.floor(Math.random()*gridLines.length)];
+      const rZ=gridLines[Math.floor(Math.random()*gridLines.length)];
+      makePedestrian(rX+5+(Math.random()-0.5)*7, rZ+(Math.random()-0.5)*14);
+    }
+
+    // Markers
+    pickupMarker=makeMarker(0xffee00);
+    destMarker=makeMarker(0xff2244);
+
+    setLoadProgress(100,'Tayyar hai!');
+    setTimeout(()=>{
+      document.getElementById('loadScreen').classList.remove('show');
+      gameStarted=true;
+      updateMissionUI();
+      showMsg('🚕 GAME SHURU!','Passenger dhundo aur pickup karo!');
+      setTimeout(spawnPassenger,2000);
+      requestAnimationFrame(gameLoop);
+    },600);
+  });
+}
+
+function setLoadProgress(pct,txt) {
+  document.getElementById('loadBar').style.width=pct+'%';
+  document.getElementById('loadText').textContent=txt;
+}
+
+// ══════════════════════════════════════════════════════════
+// PASSENGER SYSTEM
+// ══════════════════════════════════════════════════════════
+const passengerTypes=[
+  {type:'normal',  label:'NORMAL',   color:'#88aaff',base:60, tip:0,   minRating:1},
+  {type:'business',label:'BUSINESS', color:'#44ccff',base:120,tip:20,  minRating:2},
+  {type:'rich',    label:'RICH 💰',  color:'#ffcc00',base:200,tip:80,  minRating:3},
+  {type:'vip',     label:'VIP ⭐',   color:'#ff44aa',base:400,tip:200, minRating:4},
+];
+
+const locations=[
+  {name:'Harmandir Sahib',x:20,z:-40},{name:'Wagah Border',x:-60,z:60},
+  {name:'Amritsar Airport',x:60,z:40},{name:'Mall Road',x:0,z:20},
+  {name:'Bus Stand',x:-40,z:0},{name:'Railway Station',x:40,z:-20},
+  {name:'Jallianwala Bagh',x:-20,z:-60},{name:'Ranjit Nagar',x:60,z:-40},
+  {name:'Civil Lines',x:-60,z:-20},{name:'Lawrence Road',x:20,z:60},
+];
+
+function snapToRoad(p) {
+  let bX=gridLines.reduce((a,b)=>Math.abs(b-p.x)<Math.abs(a-p.x)?b:a);
+  let bZ=gridLines.reduce((a,b)=>Math.abs(b-p.z)<Math.abs(a-p.z)?b:a);
+  return Math.abs(bX-p.x)<Math.abs(bZ-p.z)?{x:bX,z:p.z}:{x:p.x,z:bZ};
+}
+
+function spawnPassenger() {
+  if (state.hasPassenger||state.waitingPickup) return;
+  let avail=passengerTypes.filter(p=>p.minRating<=state.rating);
+  const weights=avail.map(t=>t.type==='vip'?1:t.type==='rich'?3:t.type==='business'?5:9);
+  const total=weights.reduce((a,b)=>a+b,0);
+  let r=Math.random()*total, chosen=avail[0];
+  for (let i=0;i<avail.length;i++){r-=weights[i];if(r<=0){chosen=avail[i];break;}}
+
+  const locs=[...locations].sort(()=>Math.random()-0.5);
+  state.passenger={...chosen};
+  state.pickupPos=snapToRoad(locs[0]);
+  state.destPos=snapToRoad(locs[1]);
+  state.waitingPickup=true;
+  state.rideTimer=0;
+  state.rideTimeLimit=50+Math.random()*40;
+
+  pickupMarker.position.set(state.pickupPos.x,0,state.pickupPos.z);
+  pickupMarker.visible=true; destMarker.visible=false;
+
+  document.getElementById('passType').textContent=chosen.label;
+  document.getElementById('passType').style.color=chosen.color;
+  document.getElementById('passDest').textContent='→ '+locs[1].name;
+  document.getElementById('passFare').textContent='₹'+(chosen.base+chosen.tip);
+  document.getElementById('passengerPanel').classList.add('show');
+  showMsg('🚕 Passenger Aya!',locs[1].name+' le ke jao');
+}
+
+function pickupPassenger() {
+  state.hasPassenger=true; state.waitingPickup=false;
+  pickupMarker.visible=false;
+  destMarker.position.set(state.destPos.x,0,state.destPos.z);
+  destMarker.visible=true;
+  showMsg('👤 Passenger Chadh Gaya!','Destination te jao jaldi!');
+}
+
+function dropPassenger() {
+  const p=state.passenger;
+  const tBonus=Math.max(0,Math.floor((state.rideTimeLimit-state.rideTimer)/state.rideTimeLimit*p.base*0.3));
+  const sBonus=state.crashCooldown<=0?Math.floor(p.base*0.1):0;
+  const earned=p.base+p.tip+tBonus+sBonus;
+  state.money+=earned; state.rides++; state.safeRides++; state.missionProgress++;
+  state.rating=Math.min(5,state.rating+(tBonus>0?0.15:0.05)+(sBonus>0?0.1:0));
+  checkMission();
+  state.hasPassenger=false; destMarker.visible=false;
+  document.getElementById('passengerPanel').classList.remove('show');
+  document.getElementById('moneyVal').textContent='₹'+state.money;
+  document.getElementById('ridesVal').textContent=state.rides;
+  updateStars();
+  showMoneyPopup('+₹'+earned+(tBonus>0?' ⚡Speed!':'')+(sBonus>0?' 🛡Safe!':''));
+  showMsg('✅ Ride Mukk Gai!','+₹'+earned);
+  setTimeout(spawnPassenger,3000);
+}
+
+// ══════════════════════════════════════════════════════════
+// MISSION
+// ══════════════════════════════════════════════════════════
+function checkMission() {
+  const m=state.missions[state.currentMission];
+  let done=false;
+  if (m.type==='rides') done=state.rides>=m.target;
+  else if (m.type==='vip') done=state.passenger&&state.passenger.type==='vip';
+  else if (m.type==='safe') done=state.safeRides>=m.target;
+  if (done) {
+    state.money+=m.reward;
+    document.getElementById('moneyVal').textContent='₹'+state.money;
+    showMoneyPopup('🏆 MISSION! +₹'+m.reward);
+    state.currentMission=(state.currentMission+1)%state.missions.length;
+    state.safeRides=0;
+    updateMissionUI();
+  }
+}
+function updateMissionUI() {
+  document.getElementById('missionText').textContent='MISSION: '+state.missions[state.currentMission].text;
+  document.getElementById('missionPanel').classList.add('show');
+}
+
+// ══════════════════════════════════════════════════════════
+// UI HELPERS
+// ══════════════════════════════════════════════════════════
+function updateStars() {
+  const r=Math.round(state.rating);
+  for (let i=1;i<=5;i++) document.getElementById('s'+i).className='star'+(i<=r?' lit':'');
+}
+var msgTimeout=null;
+function showMsg(txt,sub) {
+  const o=document.getElementById('msgOverlay');
+  document.getElementById('msgText').textContent=txt;
+  document.getElementById('msgSub').textContent=sub||'';
+  o.classList.add('show');
+  clearTimeout(msgTimeout);
+  msgTimeout=setTimeout(()=>o.classList.remove('show'),2600);
+}
+function showMoneyPopup(txt) {
+  const el=document.createElement('div');
+  el.className='money-popup'; el.textContent=txt;
+  el.style.left=(30+Math.random()*40)+'%'; el.style.top='38%';
+  document.body.appendChild(el);
+  setTimeout(()=>el.remove(),1500);
+}
+function showWarn(txt) {
+  const w=document.getElementById('modelWarn');
+  w.textContent=txt; w.style.display='block';
+  setTimeout(()=>w.style.display='none',5000);
+}
+function honk() { showMsg('📢 BEEP BEEP!',''); }
+
+// ══════════════════════════════════════════════════════════
+// CONTROLS
+// ══════════════════════════════════════════════════════════
+const keys=state.keys;
+document.addEventListener('keydown',e=>{
+  if(e.key==='ArrowUp'||e.key==='w'||e.key==='W') keys.up=true;
+  if(e.key==='ArrowDown'||e.key==='s'||e.key==='S') keys.down=true;
+  if(e.key==='ArrowLeft'||e.key==='a'||e.key==='A') keys.left=true;
+  if(e.key==='ArrowRight'||e.key==='d'||e.key==='D') keys.right=true;
+  if(e.key==='h'||e.key==='H') honk();
+});
+document.addEventListener('keyup',e=>{
+  if(e.key==='ArrowUp'||e.key==='w'||e.key==='W') keys.up=false;
+  if(e.key==='ArrowDown'||e.key==='s'||e.key==='S') keys.down=false;
+  if(e.key==='ArrowLeft'||e.key==='a'||e.key==='A') keys.left=false;
+  if(e.key==='ArrowRight'||e.key==='d'||e.key==='D') keys.right=false;
+});
+function pressBtn(dir,on) {
+  keys[dir]=on;
+  const ids={up:'btnUp',down:'btnDown',left:'btnLeft',right:'btnRight'};
+  const b=document.getElementById(ids[dir]);
+  if(b) b.classList.toggle('pressed',on);
+}
+
+// ══════════════════════════════════════════════════════════
+// PHYSICS
+// ══════════════════════════════════════════════════════════
+const ACCEL=0.016, DECEL=0.024, FRIC=0.011, TURN=0.038;
+
+function checkBuildingCol(x,z) {
+  for (const b of buildings) {
+    if(Math.abs(x-b.x)<b.w/2+0.7&&Math.abs(z-b.z)<b.d/2+0.7) return true;
+  }
+  return false;
+}
+function checkTrafficCol(x,z) {
+  for (const tc of state.trafficCars) {
+    if(Math.sqrt((x-tc.x)**2+(z-tc.z)**2)<2.8) return true;
+  }
+  return false;
+}
+
+function onCrash() {
+  if(state.crashCooldown>0) return;
+  state.crashCooldown=130;
+  state.speed*=-0.35;
+  state.rating=Math.max(1,state.rating-0.3);
+  state.safeRides=0;
+  updateStars();
+  const f=document.getElementById('crashFlash');
+  f.classList.add('show'); setTimeout(()=>f.classList.remove('show'),180);
+  showMsg('💥 CRASH!','Rating ghatt gai!');
+}
+
+function lateArrival() {
+  state.rating=Math.max(1,state.rating-0.2);
+  updateStars();
+  const earned=Math.floor(state.passenger.base*0.5);
+  state.money+=earned; state.rides++;
+  state.hasPassenger=false; destMarker.visible=false;
+  document.getElementById('passengerPanel').classList.remove('show');
+  document.getElementById('moneyVal').textContent='₹'+state.money;
+  document.getElementById('ridesVal').textContent=state.rides;
+  showMsg('⏰ LATE!','Half payment mili');
+  setTimeout(spawnPassenger,3000);
+}
+
+function updateCar(dt) {
+  if (!taxiGroup) return;
+  const hasFuel=state.fuel>0;
+
+  if (keys.up&&hasFuel) state.speed+=ACCEL;
+  else if (keys.down) state.speed=state.speed>0.01?state.speed-DECEL:state.speed>-0.16?state.speed-ACCEL*0.5:state.speed;
+  else state.speed=Math.abs(state.speed)<FRIC?0:state.speed-Math.sign(state.speed)*FRIC;
+
+  state.speed=Math.max(-0.18,Math.min(state.maxSpeed,state.speed));
+
+  if (Math.abs(state.speed)>0.005) {
+    const turn=(keys.left?1:keys.right?-1:0)*TURN*Math.sign(state.speed)*Math.min(1,Math.abs(state.speed)/0.08);
+    state.angle+=turn;
+  }
+
+  const nx=state.pos.x+Math.sin(state.angle)*state.speed;
+  const nz=state.pos.z+Math.cos(state.angle)*state.speed;
+  const cx=Math.max(-96,Math.min(96,nx));
+  const cz=Math.max(-96,Math.min(96,nz));
+
+  if(Math.abs(nx)>96||Math.abs(nz)>96) { state.speed*=-0.3; }
+  else if(checkBuildingCol(cx,cz)) { onCrash(); }
+  else if(Math.abs(state.speed)>0.06&&checkTrafficCol(cx,cz)) { onCrash(); }
+  else { state.pos.x=cx; state.pos.z=cz; }
+
+  // Fuel
+  if(keys.up&&state.speed>0.05){
+    state.fuel=Math.max(0,state.fuel-0.012);
+    document.getElementById('fuelLevel').style.width=state.fuel+'%';
+    document.getElementById('fuelIcon').textContent=state.fuel<20?'⛽❗':'⛽';
+  }
+  // Refuel near station
+  for(const fs of state.fuelStations){
+    if(Math.sqrt((state.pos.x-fs.x)**2+(state.pos.z-fs.z)**2)<fs.r){
+      state.fuel=Math.min(100,state.fuel+0.4);
+      document.getElementById('fuelLevel').style.width=state.fuel+'%';
+      break;
+    }
+  }
+  document.getElementById('fuelAlert').style.display=(state.fuel<20)?'block':'none';
+
+  // Update taxi mesh
+  taxiGroup.position.set(state.pos.x,0,state.pos.z);
+  taxiGroup.rotation.y=state.angle;
+
+  // Third-person camera — behind and above the taxi
+  const CAM_BACK  = 10;   // distance behind car
+  const CAM_HEIGHT = 5.5; // height above car
+  const CAM_LOOK_AHEAD = 2; // look slightly ahead of car
+
+  // Smoothly interpolate camera angle towards car angle
+  if (typeof camera._camAngle === 'undefined') camera._camAngle = state.angle;
+  // Smooth follow — lerp camera yaw toward car yaw
+  let angleDiff = state.angle - camera._camAngle;
+  // Normalise to -PI..PI
+  while (angleDiff >  Math.PI) angleDiff -= Math.PI * 2;
+  while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
+  camera._camAngle += angleDiff * 0.12;
+
+  const camA = camera._camAngle;
+  const targetX = state.pos.x - Math.sin(camA) * CAM_BACK;
+  const targetZ = state.pos.z - Math.cos(camA) * CAM_BACK;
+
+  camera.position.set(targetX, CAM_HEIGHT, targetZ);
+  camera.rotation.order = 'YXZ';
+
+  // Look at a point slightly ahead of the car
+  const lookX = state.pos.x + Math.sin(camA) * CAM_LOOK_AHEAD;
+  const lookY = 1.2;
+  const lookZ = state.pos.z + Math.cos(camA) * CAM_LOOK_AHEAD;
+  camera.lookAt(lookX, lookY, lookZ);
+
+  // Speed HUD
+  document.getElementById('speedVal').textContent=Math.abs(Math.round(state.speed*180));
+
+  // Crash cooldown
+  if(state.crashCooldown>0) state.crashCooldown-=dt*60;
+
+  // Ride timer
+  if(state.hasPassenger||state.waitingPickup){
+    state.rideTimer+=dt;
+    const pct=Math.max(0,1-state.rideTimer/state.rideTimeLimit);
+    document.getElementById('timerFill').style.width=(pct*100)+'%';
+    if(state.rideTimer>state.rideTimeLimit&&state.hasPassenger) lateArrival();
+  }
+
+  // Pickup / drop check
+  if(state.waitingPickup&&state.pickupPos){
+    const d=Math.sqrt((state.pos.x-state.pickupPos.x)**2+(state.pos.z-state.pickupPos.z)**2);
+    if(d<4.5) pickupPassenger();
+  }
+  if(state.hasPassenger&&state.destPos){
+    const d=Math.sqrt((state.pos.x-state.destPos.x)**2+(state.pos.z-state.destPos.z)**2);
+    if(d<4.5) dropPassenger();
+  }
+}
+
+// ══════════════════════════════════════════════════════════
+// TRAFFIC AI
+// ══════════════════════════════════════════════════════════
+function updateTraffic() {
+  state.trafficCars.forEach(tc=>{
+    if(tc.axis==='x'){
+      tc.x+=tc.dir*tc.spd;
+      if(Math.abs(tc.x)>95){tc.x=tc.dir>0?-95:95;}
+      tc.mesh.position.x=tc.x;
+      tc.mesh.rotation.y=tc.dir>0?0:Math.PI;
+    } else {
+      tc.z+=tc.dir*tc.spd;
+      if(Math.abs(tc.z)>95){tc.z=tc.dir>0?-95:95;}
+      tc.mesh.position.z=tc.z;
+      tc.mesh.rotation.y=tc.dir>0?Math.PI/2:-Math.PI/2;
+    }
+  });
+}
+
+// ══════════════════════════════════════════════════════════
+// PEDESTRIAN AI
+// ══════════════════════════════════════════════════════════
+function updatePedestrians(dt) {
+  state.pedestrians.forEach(p=>{
+    p.timer+=dt;
+    if(p.timer>3.5){p.dir+=(Math.random()-0.5)*1.2;p.timer=0;}
+    const nx=p.x+Math.cos(p.dir)*p.spd;
+    const nz=p.z+Math.sin(p.dir)*p.spd;
+    if(Math.abs(nx)<92&&Math.abs(nz)<92){p.x=nx;p.z=nz;}
+    else p.dir+=Math.PI;
+    p.mesh.position.set(p.x,0,p.z);
+    p.mesh.rotation.y=p.dir;
+    p.mesh.rotation.z=Math.sin(state.totalTime*7)*0.04;
+  });
+}
+
+// ══════════════════════════════════════════════════════════
+// TRAFFIC LIGHTS
+// ══════════════════════════════════════════════════════════
+function updateTrafficLights(dt) {
+  trafficLights.forEach(tl=>{
+    tl.timer+=dt;
+    if(tl.timer>(tl.state==='green'?7:5)){
+      tl.timer=0;
+      tl.state=tl.state==='green'?'red':'green';
+      tl.redL.material.emissive.setHex(tl.state==='red'?0x660000:0x110000);
+      tl.grnL.material.emissive.setHex(tl.state==='green'?0x004400:0x000000);
+    }
+  });
+}
+
+// ══════════════════════════════════════════════════════════
+// DAY / NIGHT
+// ══════════════════════════════════════════════════════════
+function updateDayNight(dt) {
+  state.dayTime=(state.dayTime+dt*0.25)%24;
+  const t=state.dayTime;
+  let sky,fog,sun;
+  if(t>=7&&t<18){
+    sky=new THREE.Color(0x88aaee); fog=new THREE.Color(0x88aacc); sun=1.4;
+    document.getElementById('timeIndicator').textContent='☀️';
+  } else if(t>=22||t<5){
+    sky=new THREE.Color(0x05050f); fog=new THREE.Color(0x05050f); sun=0.05;
+    document.getElementById('timeIndicator').textContent='🌙';
+  } else if(t>=5&&t<7){
+    const f=(t-5)/2;
+    sky=new THREE.Color(0x05050f).lerp(new THREE.Color(0x88aaee),f);
+    fog=sky.clone(); sun=0.05+f*1.35;
+    document.getElementById('timeIndicator').textContent='🌅';
+  } else {
+    const f=(t-18)/4;
+    sky=new THREE.Color(0x88aaee).lerp(new THREE.Color(0x05050f),f);
+    fog=sky.clone(); sun=1.4-f*1.35;
+    document.getElementById('timeIndicator').textContent='🌇';
+  }
+  renderer.setClearColor(sky);
+  scene.fog.color.copy(fog);
+  sunLight.intensity=sun;
+  ambLight.intensity=sun<0.3?0.2:0.7;
+}
+
+// ══════════════════════════════════════════════════════════
+// NAV ARROW
+// ══════════════════════════════════════════════════════════
+const ARROWS=['⬆️','↗️','➡️','↘️','⬇️','↙️','⬅️','↖️'];
+function updateNavArrow() {
+  const tgt=state.waitingPickup?state.pickupPos:(state.hasPassenger?state.destPos:null);
+  const nav=document.getElementById('navArrow');
+  const db=document.getElementById('distBadge');
+  if(!tgt){nav.classList.remove('show');db.style.display='none';return;}
+  const dx=tgt.x-state.pos.x, dz=tgt.z-state.pos.z;
+  const dist=Math.sqrt(dx*dx+dz*dz);
+  const worldAngle=Math.atan2(dz,dx);
+  const rel=worldAngle+state.angle;
+  const idx=((Math.round(rel/(Math.PI*2)*8)%8)+8)%8;
+  nav.textContent=ARROWS[idx]; nav.classList.add('show');
+  db.style.display='block'; db.textContent=Math.round(dist*10)+'m';
+}
+
+// ══════════════════════════════════════════════════════════
+// MINIMAP
+// ══════════════════════════════════════════════════════════
+const mmCanvas=document.getElementById('minimapCanvas');
+const mctx=mmCanvas.getContext('2d');
+function drawMinimap() {
+  const cx=55,cy=55,sc=0.5;
+  mctx.clearRect(0,0,110,110);
+  mctx.fillStyle='#0d0d0d';
+  mctx.beginPath(); mctx.arc(cx,cy,53,0,Math.PI*2); mctx.fill();
+
+  // Roads
+  mctx.strokeStyle='#3a3a3a'; mctx.lineWidth=3;
+  for(const gx of gridLines){
+    const sx=cx+(gx-state.pos.x)*sc;
+    mctx.beginPath();mctx.moveTo(sx,0);mctx.lineTo(sx,110);mctx.stroke();
+  }
+  for(const gz of gridLines){
+    const sz=cy+(gz-state.pos.z)*sc;
+    mctx.beginPath();mctx.moveTo(0,sz);mctx.lineTo(110,sz);mctx.stroke();
+  }
+  // Fuel stations
+  for(const fs of state.fuelStations){
+    const fx=cx+(fs.x-state.pos.x)*sc, fz=cy+(fs.z-state.pos.z)*sc;
+    mctx.fillStyle='#ff6600';
+    mctx.fillRect(fx-3,fz-3,6,6);
+  }
+  // Pickup
+  if(state.waitingPickup&&state.pickupPos){
+    const px=cx+(state.pickupPos.x-state.pos.x)*sc;
+    const pz=cy+(state.pickupPos.z-state.pos.z)*sc;
+    mctx.fillStyle='#ffe600';
+    mctx.beginPath();mctx.arc(px,pz,5,0,Math.PI*2);mctx.fill();
+  }
+  // Destination
+  if(state.hasPassenger&&state.destPos){
+    const dx=cx+(state.destPos.x-state.pos.x)*sc;
+    const dz=cy+(state.destPos.z-state.pos.z)*sc;
+    mctx.fillStyle='#ff2244';
+    mctx.beginPath();mctx.arc(dx,dz,5,0,Math.PI*2);mctx.fill();
+  }
+  // Traffic
+  state.trafficCars.forEach(tc=>{
+    const tx=cx+(tc.x-state.pos.x)*sc, tz=cy+(tc.z-state.pos.z)*sc;
+    mctx.fillStyle='#ff8800';
+    mctx.fillRect(tx-2,tz-2,4,4);
+  });
+  // Player arrow
+  mctx.save(); mctx.translate(cx,cy); mctx.rotate(-state.angle);
+  mctx.fillStyle='#ffe600';
+  mctx.beginPath();mctx.moveTo(0,-8);mctx.lineTo(-5,6);mctx.lineTo(5,6);
+  mctx.closePath();mctx.fill();
+  mctx.restore();
+  // Clip circle
+  mctx.globalCompositeOperation='destination-in';
+  mctx.beginPath();mctx.arc(cx,cy,53,0,Math.PI*2);mctx.fill();
+  mctx.globalCompositeOperation='source-over';
+}
+
+// ══════════════════════════════════════════════════════════
+// MARKER ANIMATION
+// ══════════════════════════════════════════════════════════
+function updateMarkers() {
+  const t=performance.now()*0.001;
+  [pickupMarker,destMarker].forEach(m=>{
+    if(!m||!m.visible) return;
+    m.rotation.y=t*1.8;
+    m.userData.ring.scale.setScalar(1+0.22*Math.sin(t*3.5));
+    m.position.y=0.12*Math.sin(t*2.2);
+  });
+}
+
+// ══════════════════════════════════════════════════════════
+// MAIN LOOP
+// ══════════════════════════════════════════════════════════
+let lastTime=0;
+function gameLoop(ts) {
+  requestAnimationFrame(gameLoop);
+  if(!gameStarted) return;
+  const dt=Math.min((ts-lastTime)/1000,0.05);
+  lastTime=ts;
+  state.totalTime+=dt;
+
+  updateCar(dt);
+  updateTraffic();
+  updatePedestrians(dt);
+  updateDayNight(dt);
+  updateTrafficLights(dt);
+  updateMarkers();
+  updateNavArrow();
+  drawMinimap();
+
+  renderer.render(scene,camera);
+}
+
+// Prevent default touch
+document.addEventListener('touchmove',e=>e.preventDefault(),{passive:false});
+document.addEventListener('contextmenu',e=>e.preventDefault());
+</script>
+</body>
+</html>
